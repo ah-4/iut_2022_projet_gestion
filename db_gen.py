@@ -17,6 +17,7 @@ LAST_YEAR = 2021
 FIRST_YEAR = LAST_YEAR - 30
 
 DATA_TYPES = ('NB_POPULATION', 'PIB', 'TEC')
+SECTORS = ('CIMENT', 'CHARBON', 'GAZ', 'HUILE', 'AUTRES', 'PART_MONDIAL')
 
 CONTINENTS_FILEPATH = "data/continent_country.csv"
 
@@ -31,6 +32,8 @@ COUNTRIES_CO2_VALUES_START_INDEX = COUNTRIES_CO2_COLUMN_NAMES_LINE_INDEX + 1  # 
 COUNTRIES_POP_FILEPATH = "data/countries_population.xls"  # Excel file path for CO2 emissions per country
 COUNTRIES_POP_COLUMN_NAMES_LINE_INDEX = 2  # Line for information (Country Name, Years...)
 COUNTRIES_POP_VALUES_START_INDEX = COUNTRIES_POP_COLUMN_NAMES_LINE_INDEX + 1  # First line of datas
+
+COUNTRIES_CO2_PER_SECTOR = "data/countries_co2_data.xls"
 
 DATABASE_OUT_PATH = 'GeoDatabase.db'  # Database output file path
 
@@ -156,7 +159,7 @@ def init_tables():
             "TypeDonnee",
             (
                 "NumTypeDonnee INTEGER PRIMARY KEY AUTOINCREMENT",
-                "NomTypeDonnee TEXT NOT NULL"
+                "NomTypeDonnee TEXT NOT NULL UNIQUE"
             )
         ),
         "Inform": (
@@ -169,6 +172,25 @@ def init_tables():
                 _sql_foreign_key("NumPays", "Pays", "NumPays"),
                 _sql_foreign_key("NumTypeDonnee", "TypeDonnee", "NumTypeDonnee"),
                 "UNIQUE(NumPays, NumTypeDonnee, Annee)"
+            )
+        ),
+        "Sector": (
+            "Secteur",
+            (
+                "NumSecteur INTEGER PRIMARY KEY AUTOINCREMENT",
+                "NomSecteur TEXT NOT NULL UNIQUE"
+            )
+        ),
+        "Part": (
+            "Repartir",
+            (
+                "NumPays INTEGER NOT NULL",
+                "NumSecteur INTEGER NOT NULL",
+                "Valeur REAL",
+                "Annee INTEGER NOT NULL",
+                _sql_foreign_key("NumPays", "Pays", "NumPays"),
+                _sql_foreign_key("NumSecteur", "Secteur", "NumSecteur"),
+                "UNIQUE(NumPays, NumSecteur, Annee)"
             )
         )
     }
@@ -232,14 +254,25 @@ def fill_countries():
             log("Country {} has been associated with the continent of {}".format(country_code, continent))
 
 
+def _fill_type(values, table_name, column_name):
+    """
+    FIll the requested table with values.
+    :param values: Values to insert
+    :param table_name: Table name
+    :param column_name: Column name
+    """
+    for data_type in values:
+        request = _sql_request_insert_into(table_name, {column_name: data_type})
+        cursor.execute(request)
+        log("Data type ({}) {} has been inserted!".format(table_name, data_type))
+
+
 def fill_data_types():
     """
     Insert data types into the database
     """
-    for data_type in DATA_TYPES:
-        request = _sql_request_insert_into("TypeDonnee", {"NomTypeDonnee": data_type})
-        cursor.execute(request)
-        log("Data type {} has been inserted!".format(data_type))
+    _fill_type(DATA_TYPES, "TypeDonnee", "NomTypeDonnee")
+    _fill_type(SECTORS, "Secteur", "NomSecteur")
 
 
 def init_default_tables():
@@ -247,11 +280,8 @@ def init_default_tables():
     Fulfill Countries and Geographical Zones tables
     """
     fill_data_types()
-    con.commit()
     fill_geo_zones()
-    con.commit()
     fill_countries()
-    con.commit()
 
 
 def fetch_country_usual_data(xls_file, info_line_index, first_data_line_index, data_type):
@@ -290,7 +320,50 @@ def fetch_country_usual_data(xls_file, info_line_index, first_data_line_index, d
             df.loc[i][country_code_id] != ""
         except Exception:
             break
-    con.commit()
+
+
+def fetch_co2_per_country():
+    """
+    Fetch CO2 per sector per country
+    """
+
+    info_columns = (
+        "iso_code",
+        "year"
+    )
+
+    data_columns = ("cement_co2",
+        "coal_co2",
+        "gas_co2",
+        "oil_co2",
+        "other_industry_co2",
+        "share_global_co2")
+
+    fixed_columns = {}
+    for i in range(len(data_columns)):
+        fixed_columns[data_columns[i]] = SECTORS[i]
+
+    df = pd.read_excel(COUNTRIES_CO2_PER_SECTOR)
+    df = df[list(info_columns + data_columns)]
+    for data in df.itertuples(False):
+        country_code = str(data.iso_code)
+        if country_code == 'nan':
+            continue
+        year = data.year
+        for fixed_column, sector_name in fixed_columns.items():
+            value = data[len(info_columns) + data_columns.index(fixed_column)]
+            if str(value) == 'nan':
+                continue
+            sector_id = _sql_query("SELECT NumSecteur FROM Secteur WHERE NomSecteur = '{}'".format(sector_name))[0][0]
+            try:
+                country_id = _sql_query("SELECT NumPays FROM Pays WHERE CodePays = '{}'".format(country_code))[0][0]
+            except Exception:
+                continue
+            request = _sql_request_insert_into("Repartir",
+                                               {"NumPays": country_id, "NumSecteur": sector_id, "Annee": year,
+                                                "Valeur": value})
+            con.execute(request)
+            log("Part of {} in country {} has been added! ({})".format(fixed_column, country_code, value))
 
 
 def fetch_datas():
@@ -300,6 +373,7 @@ def fetch_datas():
     fetch_country_usual_data(COUNTRIES_GDP_FILEPATH, COUNTRIES_GDP_COLUMN_NAMES_LINE_INDEX, COUNTRIES_GDP_VALUES_START_INDEX, "PIB")
     fetch_country_usual_data(COUNTRIES_CO2_FILEPATH, COUNTRIES_CO2_COLUMN_NAMES_LINE_INDEX, COUNTRIES_CO2_VALUES_START_INDEX, "TEC")
     fetch_country_usual_data(COUNTRIES_POP_FILEPATH, COUNTRIES_POP_COLUMN_NAMES_LINE_INDEX, COUNTRIES_POP_VALUES_START_INDEX, "NB_POPULATION")
+    fetch_co2_per_country()
 
 
 def fulfill_database():
@@ -315,12 +389,15 @@ def tests():
     Print all test results
     """
     print("Tests:")
+
     print("Test get countries:")
     print(_sql_query("SELECT * FROM Pays"))
+
     print("Test ID selections:")
     data_type_id = _sql_query("SELECT NumTypeDonnee FROM TypeDonnee WHERE NomTypeDonnee = 'NB_POPULATION'")[0][0]
     country_id = _sql_query("SELECT NumPays FROM Pays WHERE CodePays = 'ZWE'")[0][0]
     print(data_type_id, country_id)
+
     print("Test selection USA on all data types:")
     request = \
         """
@@ -328,6 +405,17 @@ def tests():
         INNER JOIN Pays ON Informer.NumPays = Pays.NumPays AND Pays.CodePays = 'USA'
         INNER JOIN TypeDonnee ON Informer.NumTypeDonnee = TypeDonnee.NumTypeDonnee
         WHERE ANNEE = 2018;
+        """
+    print(request)
+    print(_sql_query(request))
+
+    print("Test selection USA on all data types:")
+    request = \
+        """
+        SELECT Valeur, NomSecteur FROM Repartir
+        INNER JOIN Pays ON Repartir.NumPays = Pays.NumPays AND Pays.CodePays = 'USA'
+        INNER JOIN Secteur ON Repartir.NumSecteur = Secteur.NumSecteur
+        WHERE ANNEE = 2016;
         """
     print(request)
     print(_sql_query(request))
@@ -345,6 +433,7 @@ def main():
     fulfill_database()
     tests()
     if con is not None:
+        con.commit()
         con.close()
         print("Connection to database closed!")
 
