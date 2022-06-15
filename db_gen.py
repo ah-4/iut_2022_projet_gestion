@@ -401,8 +401,8 @@ def create_and_fill_views():
             final_request_geo_zones += (" OR " if len(geo_zones) > 1 else "") + "NumZoneGeo = {}".format(geo_id)
         final_request_countries += "CodePays = '{}'".format(c) + ("" if i == ilen - 1 else " OR ")
         i += 1
-    con.execute('CREATE VIEW PaysImplentes AS SELECT * FROM Pays WHERE ' + final_request_countries)
-    con.execute('CREATE VIEW ZoneGeoImplentes AS SELECT * FROM ZoneGeographique WHERE ' + final_request_geo_zones)
+    con.execute('CREATE VIEW PaysImplantes AS SELECT * FROM Pays WHERE ' + final_request_countries)
+    con.execute('CREATE VIEW ZoneGeoImplantes AS SELECT * FROM ZoneGeographique WHERE ' + final_request_geo_zones)
 
 
 def fulfill_database():
