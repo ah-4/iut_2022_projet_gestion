@@ -37,6 +37,8 @@ COUNTRIES_CO2_PER_SECTOR = "data/countries_co2_data.xls"
 
 DATABASE_OUT_PATH = 'GeoDatabase.db'  # Database output file path
 
+IMPLEMENTED_COUNTRIES_CODE = ('FRA', 'DEU', 'CIV', 'CHN', 'IND', 'USA', 'DNK')
+
 # Objects
 con = None  # Database connection
 cursor = None  # Database cursor
@@ -250,7 +252,9 @@ def fill_countries():
     for data_df in g:
         continent = data_df[0]
         for country_code in data_df[1]['Three_Letter_Country_Code'].values:
-            _sql_query("UPDATE Pays SET NumZoneGeo = (SELECT ZoneGeographique.NumZoneGeo FROM ZoneGeographique WHERE NomZoneGeo = '{}') WHERE CodePays = '{}'".format(continent, country_code))
+            _sql_query(
+                "UPDATE Pays SET NumZoneGeo = (SELECT ZoneGeographique.NumZoneGeo FROM ZoneGeographique WHERE NomZoneGeo = '{}') WHERE CodePays = '{}'".format(
+                    continent, country_code))
             log("Country {} has been associated with the continent of {}".format(country_code, continent))
 
 
@@ -305,13 +309,15 @@ def fetch_country_usual_data(xls_file, info_line_index, first_data_line_index, d
         data_line = df.loc[i]
         country_code = data_line[country_code_id]
         country_id = _sql_query("SELECT NumPays FROM Pays WHERE CodePays = '{}'".format(country_code))[0][0]
-        data_type_id = _sql_query("SELECT NumTypeDonnee FROM TypeDonnee WHERE NomTypeDonnee = '{}'".format(data_type))[0][0]
+        data_type_id = \
+        _sql_query("SELECT NumTypeDonnee FROM TypeDonnee WHERE NomTypeDonnee = '{}'".format(data_type))[0][0]
         for year in range(FIRST_YEAR, LAST_YEAR + 1):
             value = data_line[years[year]]
             if str(value).lower() in ("nan", ""):
                 continue
-            request = _sql_request_insert_into("Informer", {"NumPays": country_id, "NumTypeDonnee": data_type_id, "Annee": year,
-                                                  "Valeur": value})
+            request = _sql_request_insert_into("Informer",
+                                               {"NumPays": country_id, "NumTypeDonnee": data_type_id, "Annee": year,
+                                                "Valeur": value})
             cursor.execute(request)
             log("The value for the country with code ({}) has been inserted for data type {} in {}: {}".format(
                 country_code, data_type, year, value))
@@ -333,11 +339,11 @@ def fetch_co2_per_country():
     )
 
     data_columns = ("cement_co2",
-        "coal_co2",
-        "gas_co2",
-        "oil_co2",
-        "other_industry_co2",
-        "share_global_co2")
+                    "coal_co2",
+                    "gas_co2",
+                    "oil_co2",
+                    "other_industry_co2",
+                    "share_global_co2")
 
     fixed_columns = {}
     for i in range(len(data_columns)):
@@ -370,10 +376,33 @@ def fetch_datas():
     """
     Fetch all datas for each data type
     """
-    fetch_country_usual_data(COUNTRIES_GDP_FILEPATH, COUNTRIES_GDP_COLUMN_NAMES_LINE_INDEX, COUNTRIES_GDP_VALUES_START_INDEX, "PIB")
-    fetch_country_usual_data(COUNTRIES_CO2_FILEPATH, COUNTRIES_CO2_COLUMN_NAMES_LINE_INDEX, COUNTRIES_CO2_VALUES_START_INDEX, "TEC")
-    fetch_country_usual_data(COUNTRIES_POP_FILEPATH, COUNTRIES_POP_COLUMN_NAMES_LINE_INDEX, COUNTRIES_POP_VALUES_START_INDEX, "NB_POPULATION")
+    fetch_country_usual_data(COUNTRIES_GDP_FILEPATH, COUNTRIES_GDP_COLUMN_NAMES_LINE_INDEX,
+                             COUNTRIES_GDP_VALUES_START_INDEX, "PIB")
+    fetch_country_usual_data(COUNTRIES_CO2_FILEPATH, COUNTRIES_CO2_COLUMN_NAMES_LINE_INDEX,
+                             COUNTRIES_CO2_VALUES_START_INDEX, "TEC")
+    fetch_country_usual_data(COUNTRIES_POP_FILEPATH, COUNTRIES_POP_COLUMN_NAMES_LINE_INDEX,
+                             COUNTRIES_POP_VALUES_START_INDEX, "NB_POPULATION")
     fetch_co2_per_country()
+
+
+def create_and_fill_views():
+    """
+    Create views with implemented countries their geo zone
+    """
+    geo_zones = []
+    final_request_countries = ""
+    final_request_geo_zones = ""
+    ilen = len(IMPLEMENTED_COUNTRIES_CODE)
+    i = 0
+    for c in IMPLEMENTED_COUNTRIES_CODE:
+        geo_id = _sql_query("SELECT NumZoneGeo FROM Pays WHERE CodePays='{}'".format(c))[0][0]
+        if not geo_id in geo_zones:
+            geo_zones.append(geo_id)
+            final_request_geo_zones += (" OR " if len(geo_zones) > 1 else "") + "NumZoneGeo = {}".format(geo_id)
+        final_request_countries += "CodePays = '{}'".format(c) + ("" if i == ilen - 1 else " OR ")
+        i += 1
+    con.execute('CREATE VIEW PaysImplentes AS SELECT * FROM Pays WHERE ' + final_request_countries)
+    con.execute('CREATE VIEW ZoneGeoImplentes AS SELECT * FROM ZoneGeographique WHERE ' + final_request_geo_zones)
 
 
 def fulfill_database():
@@ -382,6 +411,7 @@ def fulfill_database():
     """
     init_default_tables()
     fetch_datas()
+    create_and_fill_views()
 
 
 def tests():
