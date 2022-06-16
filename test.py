@@ -79,7 +79,7 @@ app.layout = html.Div([
         
         html.Img(src="", n_clicks=0,id="imgCartes", style={'display':'None'}),
         
-        html.Div("",  style={'display':None})
+        html.Div("",  style={'display':'None'})
         
     ], style={'padding': 10, 'flex': 1}),
     html.Div(children=None,hidden=True,id="rangement"),
