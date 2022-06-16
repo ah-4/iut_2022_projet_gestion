@@ -47,15 +47,6 @@ requestActuelle = requestPIB
 plageTemps = "WHERE Annee BETWEEN 2020-10 AND 2020"
 plagePays = " AND NomPays IN "
 nbAnnees = 10
-titreGraph = "Evolution de la population"
-
-def b64_image(image_filename):
-    global imgLoad
-    if imgLoad != None:
-        with open(image_filename, 'rb') as f:
-            image = f.read()
-            return 'data:image/png;base64,' + base64.b64encode(image).decode('utf-8')
-
 app = JupyterDash(__name__)
 app.layout = html.Div([
     html.Div(children=[
