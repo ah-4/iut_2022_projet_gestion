@@ -1,3 +1,4 @@
+from gc import callbacks
 from jupyter_dash import JupyterDash
 import plotly.express as px
 from dash import dcc, html, Output, Input
@@ -29,6 +30,7 @@ pays = cur.fetchall()
 cur.execute(world)
 pays += cur.fetchall()
 pays = [sublist[0] for sublist in pays]
+listePays = None
 
 requestPIB = "SELECT NomPays, Valeur, Annee FROM Informer INNER JOIN PaysImplantes ON Informer.NumPays = PaysImplantes.NumPays INNER JOIN TypeDonnee ON Informer.NumTypeDonnee = TypeDonnee.NumTypeDonnee AND TypeDonnee.NomTypeDonnee = 'PIB'"
 requestNbPop = "SELECT NomPays, Valeur, Annee FROM Informer INNER JOIN PaysImplantes ON Informer.NumPays = PaysImplantes.NumPays INNER JOIN TypeDonnee ON Informer.NumTypeDonnee = TypeDonnee.NumTypeDonnee AND TypeDonnee.NomTypeDonnee = 'NB_POPULATION'"
@@ -36,6 +38,7 @@ requestTemp = "SELECT NomPays, Valeur, Annee FROM Informer INNER JOIN PaysImplan
 requestCarbon= "SELECT NomPays, Valeur, Annee FROM Informer INNER JOIN PaysImplantes ON Informer.NumPays = PaysImplantes.NumPays INNER JOIN TypeDonnee ON Informer.NumTypeDonnee = TypeDonnee.NumTypeDonnee AND TypeDonnee.NomTypeDonnee = 'TEC'"
 requestActuelle = requestPIB
 plageTemps = "WHERE Annee BETWEEN 2020-10 AND 2020"
+plagePays = " AND NomPays IN "
 nbAnnees = 10
 app = JupyterDash(__name__)
 app.layout = html.Div([
@@ -61,24 +64,29 @@ app.layout = html.Div([
 		id='example-graph')    
 ])
 
-@app.callback(Output("example-graph", "figure"), Input('radioItems1', 'value'),Input('radioItems2', 'value'))
-def update_output(radioItems1,radioItems2):
+@app.callback(Output("example-graph", "figure"), Input('radioItems1', 'value'),Input('radioItems2', 'value'),Input("Dropdown1",'value'))
+def update_output(radioItems1,radioItems2,Dropdown1):
+    listePays = Dropdown1
+    lasainteString = '('
+    if listePays != None :
+        for pays in enumerate(listePays):
+            lasainteString += "'"+pays[1]+"',"
+    lasainteString += "'')"
+    print(lasainteString)
     if radioItems2 == 'Données sur les 10 dernières années':
-        print("10")
         plageTemps = " WHERE Annee BETWEEN 2020-10 AND 2020"
     else :
-        print("30")
         plageTemps = " WHERE Annee BETWEEN 2020-30 AND 2020"
     if radioItems1 == "Nombre d'habitants":
-        print("habit")
         requestActuelle = requestNbPop
     elif radioItems1 == "PIB":
-        print("pib")
         requestActuelle = requestPIB
     elif radioItems1 == "Emission de CO2":
-        print("carb")
         requestActuelle = requestCarbon
-    df = pd.read_sql_query(str(requestActuelle+" "+plageTemps),con)
+    if(listePays != None):
+        df = pd.read_sql_query(str(requestActuelle+" "+plageTemps+plagePays+lasainteString),con)
+    else :
+        df = df = pd.read_sql_query(str(requestActuelle+" "+plageTemps),con)
     trace = px.line(df,x="Annee",y="Valeur",title="Evolution de la population ",color="NomPays",markers=True,labels={"NomPays":"Nom des pays"})
     return trace
 
@@ -89,30 +97,9 @@ def update_output(value):
     else:
         nbAnnees = 30
     return f'Vous souhaitez des informations sur les {nbAnnees} dernières années'
-
-'''@app.callback(
-    Output("example-graph", "figure"), 
-    Input('radioItems2', 'value'))
-def update_line_chart(value):
-    if value == 'Données sur les 10 dernières années':
-        plageTemps = " WHERE Annee BETWEEN 2020-10 AND 2020"
-    else :
-        plageTemps = " WHERE Annee BETWEEN 2020-30 AND 2020"
-    cur.execute((str(requestActuelle)+str(plageTemps)))
-    print(cur.fetchall())
-    df = pd.read_sql_query(str(requestActuelle+" "+plageTemps),con)
-    trace = px.line(df,x="Annee",y="Valeur",title="Evolution de la population",color="NomPays",markers=True,labels={"NomPays":"Nom des pays"})
-    return trace'''
-'''
-@app.callback(
-    Output("rangement", "children"), 
-    Input('radioItems1', 'value'))
-def update_line_chart(value):
-    if value == 'PIB':
-        df = pd.read_sql_query("SELECT NomPays, Valeur, Annee FROM Informer INNER JOIN PaysImplantes ON Informer.NumPays = PaysImplantes.NumPays INNER JOIN TypeDonnee ON Informer.NumTypeDonnee = TypeDonnee.NumTypeDonnee AND TypeDonnee.NomTypeDonnee = 'NB_POPULATION' WHERE Annee BETWEEN 2020-10 AND 2020", con)
-    else :
-        df = pd.read_sql_query("SELECT NomPays, Valeur, Annee FROM Informer INNER JOIN PaysImplantes ON Informer.NumPays = PaysImplantes.NumPays INNER JOIN TypeDonnee ON Informer.NumTypeDonnee = TypeDonnee.NumTypeDonnee AND TypeDonnee.NomTypeDonnee = 'NB_POPULATION' WHERE Annee BETWEEN 2020-30 AND 2020", con)
-    trace = px.line(df,x="Annee",y="Valeur",title="Evolution de la population ("+str(value)+')',color="NomPays",markers=True)
-    return trace'''
+@app.callback(Output("rangement","children"),Input("Dropdown1",'value'))
+def reqListePays(value):
+    listePays = value
+    return listePays
 if __name__ == '__main__':
     app.run_server(debug=True)
