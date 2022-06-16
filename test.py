@@ -1,19 +1,26 @@
+from contextlib import nullcontext
 from gc import callbacks
 from jupyter_dash import JupyterDash
 import plotly.express as px
-from dash import dcc, html, Output, Input
+from dash import dcc, html, Output, Input, callback_context
 import pandas as pd
 import sqlite3 as sql
 import numpy as np
 import plotly.graph_objs as go
 from plotly.offline import download_plotlyjs, init_notebook_mode
 import matplotlib as mp
+import base64
+import netCDF4 as nc
 
 
 con = sql.connect('GeoDatabase.db',check_same_thread=False)
 
 cur = con.cursor()
 
+imgLoad =None
+refreshed = 0
+imgChosen = [None for i in range(3)]
+cartes=""
 compare = ""
 valeurPaysZone = ""
 firstCountryValue = None
@@ -40,8 +47,6 @@ requestActuelle = requestPIB
 plageTemps = "WHERE Annee BETWEEN 2020-10 AND 2020"
 plagePays = " AND NomPays IN "
 nbAnnees = 10
-titreGraph = "Evolution de la population"
-
 app = JupyterDash(__name__)
 app.layout = html.Div([
     html.Div(children=[
@@ -61,12 +66,20 @@ app.layout = html.Div([
         html.Div([], id="divTest3"),
         
         html.Br(),
-        html.Button('Evolution de la température mondiale', id='btn-nclicks-1', style={'backgroundColor':'transparent',
+        html.Button('Evolution de la température mondiale', id='temp', style={'backgroundColor':'transparent',
                                                                                        'height':30, 'font-size':20}),
         html.Br(),
         html.Br(),
-        html.Button('Evolution de la montée des eaux mondiale', id='btn-nclicks-2', style={'backgroundColor':'transparent',
+        html.Button('Evolution de la montée des eaux mondiale', id='water', style={'backgroundColor':'transparent',
                                                                                            'height':30, 'font-size':20}),
+        html.Br(),
+        html.Br(),
+        html.Button('Evolution des émissions de carbone mondiale', id='carbone', style={'backgroundColor':'transparent',
+                                                                                           'height':30, 'font-size':20}),
+        
+        html.Img(src="", n_clicks=0,id="imgCartes", style={'display':'None'}),
+        
+        html.Div("",  style={'display':'None'})
         
     ], style={'padding': 10, 'flex': 1}),
     html.Div(children=None,hidden=True,id="rangement"),
@@ -77,12 +90,13 @@ app.layout = html.Div([
 @app.callback(Output("example-graph", "figure"), Input('radioItems1', 'value'),Input('radioItems2', 'value'),Input("Dropdown1",'value'))
 def update_output(radioItems1,radioItems2,Dropdown1):
     listePays = Dropdown1
-    lasainteString = '('
+    lasainteString = ''
     if listePays != None :
+        lasainteString = '('
         for pays in enumerate(listePays):
             p = pays[1].replace("'", "''")
             lasainteString += "'"+p+"',"
-    lasainteString = lasainteString[0:len(lasainteString)-1] + ')'
+        lasainteString = lasainteString[0:len(lasainteString)-1] + ')'
     print(lasainteString)
     if radioItems2 == 'Données sur les 10 dernières années':
         plageTemps = " WHERE Annee BETWEEN 2020-10 AND 2020"
@@ -104,7 +118,7 @@ def update_output(radioItems1,radioItems2,Dropdown1):
     trace = px.line(df,x="Annee",y="Valeur",title=titreGraph,color="NomPays",markers=True,labels={"NomPays":"Nom des pays"}, height=700)
     return trace
 
-@app.callback(Output("divTest3", "children"), Input('radioItems2', 'value'),)
+@app.callback(Output("divTest3", "children"), Input('radioItems2', 'value'))
 def update_output(value):
     if value == 'Données sur les 10 dernières années':
         nbAnnees = 10
@@ -115,5 +129,34 @@ def update_output(value):
 def reqListePays(value):
     listePays = value
     return listePays
+
+@app.callback(Output("imgCartes", "src"), Output("imgCartes", "style"), Input("temp", "n_clicks"), Input("water", "n_clicks"), Input("carbone", "n_clicks"))
+def update_output(valueTemp, valueWater, valueCarbone):
+    global imgLoad, imgChosen, refreshed
+    
+    choice = [valueTemp, valueWater, valueCarbone]
+    
+    changedI = 0
+    for i in range(3):
+        changedI = i
+        if choice[i] != imgChosen[i]:
+            break
+        
+    if changedI == 0:
+        imgLoad = 'mapTemp.png'
+    elif changedI == 1:
+        imgLoad = 'levelMap.png'
+    elif changedI == 2:
+        imgLoad = 'mapCO2.png'
+    
+    refreshed += 1
+    s = {'display': 'None'}
+    if refreshed > 1:
+        s = {'display': 'block'}
+        
+    print(imgLoad)
+    imgChosen = choice
+    return app.get_asset_url(imgLoad), s
+    
 if __name__ == '__main__':
     app.run_server(debug=True)
