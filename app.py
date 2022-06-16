@@ -11,7 +11,6 @@ import geopandas as gpd
 import netCDF4 as nc
 import xarray as xr
 
-xr.open_dataset("CO2.nc").to_dataframe().to_csv("evolutionCO2.csv")
 feuillesExternes = [
     {
         "href": "assets/feuilleDeStyle.css",
@@ -23,11 +22,12 @@ app.title = "Outils de visualisation de données pour CafePierre"
 
 con = sql.connect('GeoDatabase.db', check_same_thread=False)
 cur = con.cursor()
+'''
 cur.execute("SELECT * FROM Informer INNER JOIN TypeDeDonnee ON ")
 print(cur.fetchall())
 pays = cur.fetchall()
-pays = [sublist[0] for sublist in pays]
-
+pays = [sublist[0] for sublist in pays]'''
+pays = []
 event = None
 
 def b64_image(image_filename):
@@ -51,12 +51,13 @@ app.layout = html.Div(
                 {"label": area, "value": area} for area in pays
             ],
             
-            
+        
         ),
         html.Br(),
+
         html.Div(id="report"),
 
-        html.Img(src="levelMap.png",className="carte")
+        html.Img(src=b64_image("levelMap.png"),className="carte")
     ]
 )
 
