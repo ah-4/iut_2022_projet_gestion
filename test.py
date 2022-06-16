@@ -9,8 +9,11 @@ import numpy as np
 import plotly.graph_objs as go
 from plotly.offline import download_plotlyjs, init_notebook_mode
 import matplotlib as mp
+<<<<<<< HEAD
 import base64
 import netCDF4 as nc
+=======
+>>>>>>> b94c7b7 (first working graph 10-30years)
 
 
 con = sql.connect('GeoDatabase.db',check_same_thread=False)
@@ -36,6 +39,7 @@ cur.execute(requestAllValues)
 pays = cur.fetchall()
 cur.execute(world)
 pays += cur.fetchall()
+<<<<<<< HEAD
 pays = [sublist[0] for sublist in pays]
 listePays = None
 
@@ -47,6 +51,14 @@ requestActuelle = requestPIB
 plageTemps = "WHERE Annee BETWEEN 2020-10 AND 2020"
 plagePays = " AND NomPays IN "
 nbAnnees = 10
+=======
+
+pays = [sublist[0] for sublist in pays]
+
+copiePays = pays
+
+
+>>>>>>> b94c7b7 (first working graph 10-30years)
 app = JupyterDash(__name__)
 app.layout = html.Div([
     html.Div(children=[
@@ -125,6 +137,7 @@ def update_output(value):
     else:
         nbAnnees = 30
     return f'Vous souhaitez des informations sur les {nbAnnees} dernières années'
+<<<<<<< HEAD
 @app.callback(Output("rangement","children"),Input("Dropdown1",'value'))
 def reqListePays(value):
     listePays = value
@@ -158,5 +171,29 @@ def update_output(valueTemp, valueWater, valueCarbone):
     imgChosen = choice
     return app.get_asset_url(imgLoad), s
     
+=======
+
+@app.callback(
+    Output("example-graph", "figure"), 
+    Input('radioItems2', 'value'))
+def update_line_chart(value):
+    if value == 'Données sur les 10 dernières années':
+        df = pd.read_sql_query("SELECT NomPays, Valeur, Annee FROM Informer INNER JOIN PaysImplantes ON Informer.NumPays = PaysImplantes.NumPays INNER JOIN TypeDonnee ON Informer.NumTypeDonnee = TypeDonnee.NumTypeDonnee AND TypeDonnee.NomTypeDonnee = 'NB_POPULATION' WHERE Annee BETWEEN 2020-10 AND 2020", con)
+    else :
+        df = pd.read_sql_query("SELECT NomPays, Valeur, Annee FROM Informer INNER JOIN PaysImplantes ON Informer.NumPays = PaysImplantes.NumPays INNER JOIN TypeDonnee ON Informer.NumTypeDonnee = TypeDonnee.NumTypeDonnee AND TypeDonnee.NomTypeDonnee = 'NB_POPULATION' WHERE Annee BETWEEN 2020-30 AND 2020", con)
+    trace = px.line(df,x="Annee",y="Valeur",title="Evolution de la population ("+str(value)+')',color="NomPays",markers=True)
+    return trace
+'''
+@app.callback(
+    Output("rangement", "children"), 
+    Input('radioItems1', 'value'))
+def update_line_chart(value):
+    if value == 'PIB':
+        df = pd.read_sql_query("SELECT NomPays, Valeur, Annee FROM Informer INNER JOIN PaysImplantes ON Informer.NumPays = PaysImplantes.NumPays INNER JOIN TypeDonnee ON Informer.NumTypeDonnee = TypeDonnee.NumTypeDonnee AND TypeDonnee.NomTypeDonnee = 'NB_POPULATION' WHERE Annee BETWEEN 2020-10 AND 2020", con)
+    else :
+        df = pd.read_sql_query("SELECT NomPays, Valeur, Annee FROM Informer INNER JOIN PaysImplantes ON Informer.NumPays = PaysImplantes.NumPays INNER JOIN TypeDonnee ON Informer.NumTypeDonnee = TypeDonnee.NumTypeDonnee AND TypeDonnee.NomTypeDonnee = 'NB_POPULATION' WHERE Annee BETWEEN 2020-30 AND 2020", con)
+    trace = px.line(df,x="Annee",y="Valeur",title="Evolution de la population ("+str(value)+')',color="NomPays",markers=True)
+    return trace'''
+>>>>>>> b94c7b7 (first working graph 10-30years)
 if __name__ == '__main__':
     app.run_server(debug=True)
