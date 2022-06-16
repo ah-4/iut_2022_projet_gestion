@@ -7,12 +7,9 @@ import numpy as np
 import plotly.graph_objs as go
 from plotly.offline import download_plotlyjs, init_notebook_mode
 import matplotlib as mp
-import cufflinks as cf
 
-init_notebook_mode(connected=True)
-cf.go_offline()
 
-con = sql.connect('GeoDatabase.db')
+con = sql.connect('GeoDatabase.db',check_same_thread=False)
 
 cur = con.cursor()
 
@@ -24,7 +21,6 @@ typeValue = 'PIB'
 tenOrThirtyYear = 'Données sur les 10 dernières années'
 
 requestAllValues = ("SELECT NomPays FROM PaysImplantes")
-abscisseValues = [2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020]
 requestOrdonnee = ("SELECT Valeur FROM Informer INNER JOIN PaysImplantes ON Informer.NumPays = PaysImplantes.NumPays AND PaysImplantes.NomPays = 'France' INNER JOIN TypeDonnee ON Informer.NumTypeDonnee = TypeDonnee.NumTypeDonnee AND TypeDonnee.NomTypeDonnee = 'NB_POPULATION' WHERE Annee BETWEEN 2020-10 AND 2020")
 world = ("SELECT NomPays FROM Pays WHERE Pays.NomPays = 'World'")
 cur.execute(requestAllValues)
@@ -32,19 +28,10 @@ pays = cur.fetchall()
 cur.execute(world)
 pays += cur.fetchall()
 
-
-#abscisseValues = cur.execute(requestAbscisse)
-ordonneeValues = cur.fetchall()
-
-print(cur.fetchall())
-#showRequest = pd.read_sql(requestCountryOrGeoArea, con)
-
 pays = [sublist[0] for sublist in pays]
 
 copiePays = pays
 
-df = pd.read_sql_query("SELECT NomPays, Valeur, Annee FROM Informer INNER JOIN PaysImplantes ON Informer.NumPays = PaysImplantes.NumPays INNER JOIN TypeDonnee ON Informer.NumTypeDonnee = TypeDonnee.NumTypeDonnee AND TypeDonnee.NomTypeDonnee = 'NB_POPULATION' WHERE Annee BETWEEN 2020-10 AND 2020", con)
-trace = px.line(df,x="Annee",y="Valeur",title="testSARACE",color="NomPays")
 
 app = JupyterDash(__name__)
 app.layout = html.Div([
@@ -65,15 +52,9 @@ app.layout = html.Div([
         html.Div([], id="divTest3"),
         
     ], style={'padding': 10, 'flex': 1}),
-    
+    html.Div(children=None,hidden=True,id="rangement"),
     dcc.Graph(
-		id='example-graph',
-		figure={
-			'data': [trace],
-			'layout':
-			go.Layout(title='MySQL Orders Data', barmode='stack')
-		}),
-    
+		id='example-graph')    
 ])
 
 @app.callback(Output("divTest1", "children"), Input('Dropdown1', 'value'),)
@@ -115,6 +96,26 @@ def update_output(value):
         nbAnnees = 30
     return f'Vous souhaitez des informations sur les {nbAnnees} dernières années'
 
-
+@app.callback(
+    Output("example-graph", "figure"), 
+    Input('radioItems2', 'value'))
+def update_line_chart(value):
+    if value == 'Données sur les 10 dernières années':
+        df = pd.read_sql_query("SELECT NomPays, Valeur, Annee FROM Informer INNER JOIN PaysImplantes ON Informer.NumPays = PaysImplantes.NumPays INNER JOIN TypeDonnee ON Informer.NumTypeDonnee = TypeDonnee.NumTypeDonnee AND TypeDonnee.NomTypeDonnee = 'NB_POPULATION' WHERE Annee BETWEEN 2020-10 AND 2020", con)
+    else :
+        df = pd.read_sql_query("SELECT NomPays, Valeur, Annee FROM Informer INNER JOIN PaysImplantes ON Informer.NumPays = PaysImplantes.NumPays INNER JOIN TypeDonnee ON Informer.NumTypeDonnee = TypeDonnee.NumTypeDonnee AND TypeDonnee.NomTypeDonnee = 'NB_POPULATION' WHERE Annee BETWEEN 2020-30 AND 2020", con)
+    trace = px.line(df,x="Annee",y="Valeur",title="Evolution de la population ("+str(value)+')',color="NomPays",markers=True)
+    return trace
+'''
+@app.callback(
+    Output("rangement", "children"), 
+    Input('radioItems1', 'value'))
+def update_line_chart(value):
+    if value == 'PIB':
+        df = pd.read_sql_query("SELECT NomPays, Valeur, Annee FROM Informer INNER JOIN PaysImplantes ON Informer.NumPays = PaysImplantes.NumPays INNER JOIN TypeDonnee ON Informer.NumTypeDonnee = TypeDonnee.NumTypeDonnee AND TypeDonnee.NomTypeDonnee = 'NB_POPULATION' WHERE Annee BETWEEN 2020-10 AND 2020", con)
+    else :
+        df = pd.read_sql_query("SELECT NomPays, Valeur, Annee FROM Informer INNER JOIN PaysImplantes ON Informer.NumPays = PaysImplantes.NumPays INNER JOIN TypeDonnee ON Informer.NumTypeDonnee = TypeDonnee.NumTypeDonnee AND TypeDonnee.NomTypeDonnee = 'NB_POPULATION' WHERE Annee BETWEEN 2020-30 AND 2020", con)
+    trace = px.line(df,x="Annee",y="Valeur",title="Evolution de la population ("+str(value)+')',color="NomPays",markers=True)
+    return trace'''
 if __name__ == '__main__':
     app.run_server(debug=True)
