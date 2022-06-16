@@ -36,6 +36,10 @@ cur.execute(requestAllValues)
 pays = cur.fetchall()
 cur.execute(world)
 pays += cur.fetchall()
+
+pays = [sublist[0] for sublist in pays]
+listePays = None
+
 pays = [sublist[0] for sublist in pays]
 listePays = None
 
@@ -47,6 +51,7 @@ requestActuelle = requestPIB
 plageTemps = "WHERE Annee BETWEEN 2020-10 AND 2020"
 plagePays = " AND NomPays IN "
 nbAnnees = 10
+
 app = JupyterDash(__name__)
 app.layout = html.Div([
     html.Div(children=[
@@ -90,6 +95,7 @@ app.layout = html.Div([
 @app.callback(Output("example-graph", "figure"), Input('radioItems1', 'value'),Input('radioItems2', 'value'),Input("Dropdown1",'value'))
 def update_output(radioItems1,radioItems2,Dropdown1):
     listePays = Dropdown1
+
     lasainteString = ''
     if listePays != None :
         lasainteString = '('
@@ -97,6 +103,7 @@ def update_output(radioItems1,radioItems2,Dropdown1):
             p = pays[1].replace("'", "''")
             lasainteString += "'"+p+"',"
         lasainteString = lasainteString[0:len(lasainteString)-1] + ')'
+        
     print(lasainteString)
     if radioItems2 == 'Données sur les 10 dernières années':
         plageTemps = " WHERE Annee BETWEEN 2020-10 AND 2020"
@@ -111,11 +118,14 @@ def update_output(radioItems1,radioItems2,Dropdown1):
     elif radioItems1 == "Emission de CO2":
         requestActuelle = requestCarbon
         titreGraph = "Evolution des émissions de CO2"
+
     if(listePays != None):
         df = pd.read_sql_query(str(requestActuelle+" "+plageTemps+plagePays+lasainteString),con)
     else :
         df = df = pd.read_sql_query(str(requestActuelle+" "+plageTemps),con)
+
     trace = px.line(df,x="Annee",y="Valeur",title=titreGraph,color="NomPays",markers=True,labels={"NomPays":"Nom des pays"}, height=700)
+
     return trace
 
 @app.callback(Output("divTest3", "children"), Input('radioItems2', 'value'))
@@ -125,6 +135,7 @@ def update_output(value):
     else:
         nbAnnees = 30
     return f'Vous souhaitez des informations sur les {nbAnnees} dernières années'
+
 @app.callback(Output("rangement","children"),Input("Dropdown1",'value'))
 def reqListePays(value):
     listePays = value
@@ -158,5 +169,11 @@ def update_output(valueTemp, valueWater, valueCarbone):
     imgChosen = choice
     return app.get_asset_url(imgLoad), s
     
+
+@app.callback(Output("rangement","children"),Input("Dropdown1",'value'))
+def reqListePays(value):
+    listePays = value
+    return listePays
+  
 if __name__ == '__main__':
     app.run_server(debug=True)
