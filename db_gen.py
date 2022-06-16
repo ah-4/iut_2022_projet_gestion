@@ -37,7 +37,7 @@ COUNTRIES_CO2_PER_SECTOR = "data/countries_co2_data.xls"
 
 DATABASE_OUT_PATH = 'GeoDatabase.db'  # Database output file path
 
-IMPLEMENTED_COUNTRIES_CODE = ('FRA', 'DEU', 'CIV', 'CHN', 'IND', 'USA', 'DNK')
+IMPLEMENTED_COUNTRIES_CODE = ('FRA', 'DEU', 'CIV', 'CHN', 'IND', 'USA', 'DNK', 'WLD')
 
 # Objects
 con = None  # Database connection
