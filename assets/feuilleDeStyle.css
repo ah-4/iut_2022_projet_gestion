@@ -1,0 +1,11 @@
+html,body {
+    background-color: aliceblue;
+}
+.firstPart{
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+#imgCartes{
+    align-items: center;
+}

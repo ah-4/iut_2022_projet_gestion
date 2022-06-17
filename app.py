@@ -13,13 +13,16 @@ import base64
 
 
 con = sql.connect('GeoDatabase.db',check_same_thread=False)
-
 cur = con.cursor()
+# external CSS stylesheets
+external_stylesheets = ['assets/feuilleDeStyle.css']
 
 imgLoad =None
 refreshed = 0
 imgChosen = [None for i in range(3)]
 lastButtonId = None
+buttonOff = {'backgroundColor':'transparent','height':30, 'font-size':20}
+buttonOn = {'backgroundColor':'white','height':30, 'font-size':20}
 cartes=""
 compare = ""
 valeurPaysZone = ""
@@ -47,36 +50,33 @@ requestActuelle = requestPIB
 plageTemps = "WHERE Annee BETWEEN 2020-10 AND 2020"
 plagePays = " AND NomPays IN "
 nbAnnees = 10
-app = JupyterDash(__name__)
+app = JupyterDash(__name__,external_stylesheets=external_stylesheets)
 app.layout = html.Div([
-    html.Div(children=[
+    html.Div(className = "total",children=[
         
         dcc.Dropdown(pays, placeholder='Choisir des pays des zones géographiques ou les deux', id='Dropdown1',multi=True),
         html.Div([], id="divTest1"),
-        
-        html.Br(),
-        html.Label('Radio Items'),
-        dcc.RadioItems(['PIB', "Nombre d'habitants", 'Emission de CO2'],
-                       'PIB', id='radioItems1'),
-        html.Div([], id="divTest2"),
-        
-        html.Br(),
-        html.Label('Radio Items'),
-        dcc.RadioItems(['Données sur les 10 dernières années', 'Données sur les 30 dernières années'], 'Données sur les 10 dernières années', id='radioItems2'),
-        html.Div([], id="divTest3"),
-        
-        html.Br(),
-        html.Button('Evolution de la température mondiale', id='temp', style={'backgroundColor':'transparent',
-                                                                                       'height':30, 'font-size':20}),
-        html.Br(),
-        html.Br(),
-        html.Button('Evolution de la montée des eaux mondiale', id='water', style={'backgroundColor':'transparent',
-                                                                                           'height':30, 'font-size':20}),
-        html.Br(),
-        html.Br(),
-        html.Button('Evolution des émissions de carbone mondiale', id='carbone', style={'backgroundColor':'transparent',
-                                                                                           'height':30, 'font-size':20}),
-        
+        html.Div(className="firstPart",children=[
+            html.Br(),
+            html.Label('Sélectionnez le type de données que vous souhaitez visualiser :'),
+            dcc.RadioItems(['PIB', "Nombre d'habitants", 'Emission de CO2'],
+                        'PIB', id='radioItems1',className="sus"),
+            
+            html.Br(),
+            html.Label("Sélectionnez l'échelle de temps :"),
+            dcc.RadioItems(['Données sur les 10 dernières années', 'Données sur les 30 dernières années'], 'Données sur les 10 dernières années', id='radioItems2'),
+            html.Div([], id="divTest3"),
+            
+            html.Br(),
+            html.Button('Evolution de la température mondiale', id='temp', style={'backgroundColor':'transparent','height':30, 'font-size':20}),
+            html.Br(),
+            html.Br(),
+            html.Button('Evolution de la montée des eaux mondiale', id='water', style={'backgroundColor':'transparent','height':30, 'font-size':20}),
+            html.Br(),
+            html.Br(),
+            html.Button('Evolution des émissions de carbone mondiale', id='carbone', style={'backgroundColor':'transparent','height':30, 'font-size':20}),
+            html.Br(),
+        ]),
         html.Img(src="", n_clicks=0,id="imgCartes", style={'display':'None'}),
         
         html.Div("",  style={'display':'None'})
@@ -105,17 +105,20 @@ def update_output(radioItems1,radioItems2,Dropdown1):
     if radioItems1 == "Nombre d'habitants":
         requestActuelle = requestNbPop
         titreGraph = "Evolution du nombre d'habitants"
+        legende = "Nombre d'habitants"
     elif radioItems1 == "PIB":
         requestActuelle = requestPIB
         titreGraph = "Evolution du PIB"
+        legende = "Valeure du PIB (T = Trillion)"
     elif radioItems1 == "Emission de CO2":
         requestActuelle = requestCarbon
         titreGraph = "Evolution des émissions de CO2"
+        legende = "Emmissions de CO2 en tonnes"
     if(listePays != None and listePays != []):
         df = pd.read_sql_query(str(requestActuelle+" "+plageTemps+plagePays+lasainteString),con)
     else :
         df = df = pd.read_sql_query(str(requestActuelle+" "+plageTemps),con)
-    trace = px.line(df,x="Annee",y="Valeur",title=titreGraph,color="NomPays",markers=True,labels={"NomPays":"Nom des pays"}, height=700)
+    trace = px.line(df,x="Annee",y="Valeur",title=titreGraph,color="NomPays",markers=True,labels={"NomPays":"Nom des pays","Valeur":legende}, height=700)
     return trace
 
 @app.callback(Output("divTest3", "children"), Input('radioItems2', 'value'))
@@ -130,12 +133,12 @@ def reqListePays(value):
     listePays = value
     return listePays
 
-@app.callback(Output("imgCartes", "src"), Output("imgCartes", "style"), Input("temp", "n_clicks"), Input("water", "n_clicks"), Input("carbone", "n_clicks"))
+@app.callback(Output("imgCartes", "src"), Output("imgCartes", "style"),Output("temp","style"),Output("water","style"), Output("carbone","style"),  Input("temp", "n_clicks"), Input("water", "n_clicks"), Input("carbone", "n_clicks"))
 def update_output(valueTemp, valueWater, valueCarbone):
     global imgLoad, imgChosen, refreshed,lastButtonId
     
     choice = [valueTemp, valueWater, valueCarbone]
-    
+    tempStyle = waterStyle = carboneStyle = buttonOff
     changedI = 0
     for i in range(3):
         changedI = i
@@ -143,18 +146,25 @@ def update_output(valueTemp, valueWater, valueCarbone):
             break
     if changedI == 0:
         imgLoad = 'mapTemp.png'
+        tempStyle = buttonOn
     elif changedI == 1:
         imgLoad = 'levelMap.png'
+        waterStyle = buttonOn
     elif changedI == 2:
         imgLoad = 'mapCO2.png'
+        carboneStyle = buttonOn
     
     refreshed += 1
     s = {'display': 'block'}
+    print(lastButtonId)
     if refreshed <= 1 or lastButtonId == changedI:
         s = {'display': 'None'}
+        lastButtonId = None
+        tempStyle = waterStyle = carboneStyle = buttonOff
+    else :
+        lastButtonId = changedI
     imgChosen = choice
-    lastButtonId = changedI
-    return app.get_asset_url(imgLoad), s
+    return app.get_asset_url(imgLoad), s,tempStyle,waterStyle,carboneStyle
     
 if __name__ == '__main__':
     app.run_server(debug=True)
