@@ -19,6 +19,7 @@ cur = con.cursor()
 imgLoad =None
 refreshed = 0
 imgChosen = [None for i in range(3)]
+lastButtonId = None
 cartes=""
 compare = ""
 valeurPaysZone = ""
@@ -131,7 +132,7 @@ def reqListePays(value):
 
 @app.callback(Output("imgCartes", "src"), Output("imgCartes", "style"), Input("temp", "n_clicks"), Input("water", "n_clicks"), Input("carbone", "n_clicks"))
 def update_output(valueTemp, valueWater, valueCarbone):
-    global imgLoad, imgChosen, refreshed
+    global imgLoad, imgChosen, refreshed,lastButtonId
     
     choice = [valueTemp, valueWater, valueCarbone]
     
@@ -140,7 +141,6 @@ def update_output(valueTemp, valueWater, valueCarbone):
         changedI = i
         if choice[i] != imgChosen[i]:
             break
-        
     if changedI == 0:
         imgLoad = 'mapTemp.png'
     elif changedI == 1:
@@ -149,12 +149,11 @@ def update_output(valueTemp, valueWater, valueCarbone):
         imgLoad = 'mapCO2.png'
     
     refreshed += 1
-    s = {'display': 'None'}
-    if refreshed > 1:
-        s = {'display': 'block'}
-        
-    print(imgLoad)
+    s = {'display': 'block'}
+    if refreshed <= 1 or lastButtonId == changedI:
+        s = {'display': 'None'}
     imgChosen = choice
+    lastButtonId = changedI
     return app.get_asset_url(imgLoad), s
     
 if __name__ == '__main__':
