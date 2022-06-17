@@ -31,6 +31,10 @@ secondCountryValue = None
 typeValue = 'PIB'
 tenOrThirtyYear = 'Données sur les 10 dernières années'
 
+cur.execute("SELECT Annee FROM Repartir INNER JOIN PaysImplantes ON Repartir.NumPays = PaysImplantes.NumPays ")
+annees = cur.fetchall()
+annees = [sublist[0] for sublist in annees]
+
 '''Remplissage de la liste des pays'''
 requestAllValues = ("SELECT NomPays FROM PaysImplantes")
 requestOrdonnee = ("SELECT Valeur FROM Informer INNER JOIN PaysImplantes ON Informer.NumPays = PaysImplantes.NumPays AND PaysImplantes.NomPays = 'France' INNER JOIN TypeDonnee ON Informer.NumTypeDonnee = TypeDonnee.NumTypeDonnee AND TypeDonnee.NomTypeDonnee = 'NB_POPULATION' WHERE Annee BETWEEN 2020-10 AND 2020")
@@ -40,7 +44,6 @@ pays = cur.fetchall()
 cur.execute(world)
 pays += cur.fetchall()
 pays = [sublist[0] for sublist in pays]
-listePays = None
 
 requestPIB = "SELECT NomPays, Valeur, Annee FROM Informer INNER JOIN PaysImplantes ON Informer.NumPays = PaysImplantes.NumPays INNER JOIN TypeDonnee ON Informer.NumTypeDonnee = TypeDonnee.NumTypeDonnee AND TypeDonnee.NomTypeDonnee = 'PIB'"
 requestNbPop = "SELECT NomPays, Valeur, Annee FROM Informer INNER JOIN PaysImplantes ON Informer.NumPays = PaysImplantes.NumPays INNER JOIN TypeDonnee ON Informer.NumTypeDonnee = TypeDonnee.NumTypeDonnee AND TypeDonnee.NomTypeDonnee = 'NB_POPULATION'"
@@ -84,9 +87,31 @@ app.layout = html.Div([
     ], style={'padding': 10, 'flex': 1}),
     html.Div(children=None,hidden=True,id="rangement"),
     dcc.Graph(
-		id='example-graph')    
+		id='example-graph')  ,
+    html.Br(),
+    dcc.RadioItems(['Part mondiale', 'Secteurs emission'],'Part mondiale', id='radioCircle'),
+    dcc.Dropdown(annees, placeholder="Choisissez l'année recherchée :",value=2020, id='DropdownAnnee'),
+    dcc.Dropdown(pays, placeholder="Choisissez le Pays à analyser recherchée :", id='DropdownPays'),
+    dcc.Graph(
+		id='radius-graph')  
 ])
 
+
+@app.callback(Output("radius-graph", "figure"), Input('radioCircle', 'value'),Input("DropdownAnnee",'value'),Input("DropdownPays",'value'))
+def update_output(value1,value2,pays):   
+    if(value1 == "Part mondiale"):
+        df = pd.read_sql_query("SELECT * FROM Repartir INNER JOIN PaysImplantes ON Repartir.NumPays = PaysImplantes.NumPays INNER JOIN Secteur ON Secteur.NumSecteur = Repartir.NumSecteur WHERE Secteur.NumSecteur = 6 AND Repartir.Annee = " + str(value2),con)
+        fig = px.pie(df, values="Valeur", names="NomPays") 
+    elif pays != None :
+        df = pd.read_sql_query("SELECT Valeur,NomSecteur FROM Repartir INNER JOIN PaysImplantes ON Repartir.NumPays = PaysImplantes.NumPays INNER JOIN Secteur ON Secteur.NumSecteur = Repartir.NumSecteur WHERE Secteur.NumSecteur != 6 AND Repartir.Annee = " + str(value2) + " AND PaysImplantes.NomPays = '" +str(pays)+"'",con)
+        fig = px.pie(df, values="Valeur", names="NomSecteur") 
+    else:
+        print("Choisissez un pays")
+        df = pd.read_sql_query("SELECT * FROM Repartir INNER JOIN PaysImplantes ON Repartir.NumPays = PaysImplantes.NumPays INNER JOIN Secteur ON Secteur.NumSecteur = Repartir.NumSecteur WHERE Secteur.NumSecteur = 6 AND Repartir.Annee = " + str(value2),con)
+        fig = px.pie(df, values="Valeur", names="NomPays") 
+    return fig
+
+    
 @app.callback(Output("example-graph", "figure"), Input('radioItems1', 'value'),Input('radioItems2', 'value'),Input("Dropdown1",'value'))
 def update_output(radioItems1,radioItems2,Dropdown1):
     listePays = Dropdown1
@@ -165,6 +190,7 @@ def update_output(valueTemp, valueWater, valueCarbone):
         lastButtonId = changedI
     imgChosen = choice
     return app.get_asset_url(imgLoad), s,tempStyle,waterStyle,carboneStyle
-    
+
+
 if __name__ == '__main__':
     app.run_server(debug=True)
